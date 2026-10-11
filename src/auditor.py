@@ -5,6 +5,12 @@ from typing import Dict, Any, List
 import pandas as pd
 
 try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    requests = None
+    REQUESTS_AVAILABLE = False
+try:
     import google.generativeai as genai
     GENAI_AVAILABLE = True
 except ImportError:
@@ -102,7 +108,7 @@ Final URL: {final_url}
 """
 
 
-def call_gemini_auditor(ad_row: pd.Series, parsed_html: Dict[str, Any], api_key: str, model_name: str = "gemini-3.8-flash") -> Dict[str, Any]:
+def call_gemini_auditor(ad_row: pd.Series, parsed_html: Dict[str, Any], api_key: str, model_name: str = "gemini-3.7-flash") -> Dict[str, Any]:
     """Execute live Google Gemini API call with structured JSON prompting and automated resilient fallback."""
     if not GENAI_AVAILABLE:
         raise RuntimeError("google-generativeai package is not installed.")
@@ -142,9 +148,9 @@ def call_gemini_auditor(ad_row: pd.Series, parsed_html: Dict[str, Any], api_key:
     if cleaned_name and cleaned_name not in ["gemini-2.5-flash", "gemini-2.5-pro"]:
         target_models.append(cleaned_name)
     elif cleaned_name in ["gemini-2.5-flash", "gemini-2.5-pro"]:
-        target_models.append("gemini-3.8-flash")
+        target_models.append("gemini-3.7-flash")
 
-    for fallback in ["gemini-3.8-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
+    for fallback in ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
         if fallback not in target_models:
             target_models.append(fallback)
 
@@ -172,3 +178,114 @@ def call_gemini_auditor(ad_row: pd.Series, parsed_html: Dict[str, Any], api_key:
             raise RuntimeError(f"Gemini API Execution Error: {str(e)}")
 
     raise RuntimeError(f"Gemini API Execution Error: {str(last_err)}")
+
+
+
+def call_groq_auditor(
+    ad_row: pd.Series,
+    parsed_html: Dict[str, Any],
+    api_key: str,
+    model_name: str = "llama-3.3-70b-versatile"
+) -> Dict[str, Any]:
+    """Execute ultra-fast Groq LPU API call with structured JSON output and fallback hierarchy."""
+    if not requests:
+        raise RuntimeError("The 'requests' package is required to call Groq API.")
+
+    if not api_key or not api_key.strip():
+        raise ValueError("Groq API Key is required. Enter it in the sidebar or set GROQ_API_KEY.")
+
+    structured_page = format_landing_page_for_llm(parsed_html)
+
+    prompt = GEMINI_AUDIT_PROMPT_TEMPLATE.format(
+        advertiser=ad_row.get("advertiser", "Brand"),
+        vertical=ad_row.get("vertical", "General Commercial"),
+        headline_1=ad_row.get("headline_1", ""),
+        headline_2=ad_row.get("headline_2", ""),
+        headline_3=ad_row.get("headline_3", ""),
+        description_1=ad_row.get("description_1", ""),
+        description_2=ad_row.get("description_2", ""),
+        final_url=ad_row.get("final_url", ""),
+        landing_page_structured=structured_page
+    )
+
+    headers = {
+        "Authorization": f"Bearer {api_key.strip()}",
+        "Content-Type": "application/json"
+    }
+
+    cleaned_name = str(model_name or "").strip()
+    target_models = []
+    if cleaned_name:
+        target_models.append(cleaned_name)
+
+    for fallback in ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b", "mixtral-8x7b-32768"]:
+        if fallback not in target_models:
+            target_models.append(fallback)
+
+    last_err = None
+    for candidate in target_models:
+        payload = {
+            "model": candidate,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are an Enterprise-Grade Ad-to-Landing-Page Message Match Auditor & Conversion Rate Optimization (CRO) Specialist. You must output strictly valid JSON conforming exactly to the requested schema with zero markdown formatting or conversational filler."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.1,
+            "max_tokens": 4096
+        }
+
+        try:
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=45
+            )
+
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"].strip()
+                if content.startswith("```"):
+                    content = re.sub(r"^```(?:json)?\s*", "", content)
+                    content = re.sub(r"\s*```$", "", content)
+                parsed_json = json.loads(content)
+                parsed_json["_model_used"] = f"groq:{candidate}"
+                return parsed_json
+            else:
+                err_data = resp.text
+                last_err = f"HTTP {resp.status_code}: {err_data}"
+                if resp.status_code in [400, 404, 422]:
+                    continue
+                else:
+                    raise RuntimeError(f"Groq API Error ({resp.status_code}): {err_data}")
+        except Exception as e:
+            last_err = e
+            if "timeout" in str(e).lower():
+                continue
+            raise RuntimeError(f"Groq API Execution Error: {str(e)}")
+
+    raise RuntimeError(f"Groq API Execution Error: {str(last_err)}")
+
+
+def call_ai_auditor(
+    ad_row: pd.Series,
+    parsed_html: Dict[str, Any],
+    api_key: str,
+    model_name: str = "llama-3.3-70b-versatile",
+    provider: str = "groq"
+) -> Dict[str, Any]:
+    """Unified entrypoint dispatching to either Groq LPU or Google Gemini based on selected provider."""
+    p_lower = str(provider or "").lower()
+    m_lower = str(model_name or "").lower()
+
+    if "groq" in p_lower or any(k in m_lower for k in ["llama", "mixtral", "deepseek", "groq"]):
+        return call_groq_auditor(ad_row, parsed_html, api_key, model_name)
+    else:
+        return call_gemini_auditor(ad_row, parsed_html, api_key, model_name)

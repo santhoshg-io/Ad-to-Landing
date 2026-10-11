@@ -47,6 +47,8 @@ from src import (
     GEMINI_AUDIT_PROMPT_TEMPLATE,
     format_landing_page_for_llm,
     call_gemini_auditor,
+    call_groq_auditor,
+    call_ai_auditor,
     generate_excel_audit_report,
     generate_docx_audit_report,
     generate_bulk_excel_report
@@ -63,7 +65,7 @@ apply_custom_css()
 st.markdown('<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">', unsafe_allow_html=True)
 
 
-def render_bulk_leaderboard_section(df: pd.DataFrame, snap_dir: Path, user_api_key: str, model_choice: str):
+def render_bulk_leaderboard_section(df: pd.DataFrame, snap_dir: Path, user_api_key: str, model_choice: str, provider: str = "groq"):
     """Render bulk dataset audit runner, portfolio KPIs, and CRO risk leaderboard."""
     st.markdown("### ⚡ Bulk Dataset Audit & CRO Risk Leaderboard")
     st.caption("Audit multiple search ad & landing page pairs simultaneously with Google Gemini. Evaluates message symmetry, checks Above-The-Fold alignment, computes wasted ad spend, flags regulated category compliance exposure, and ranks campaigns by lowest match score to surface Top Critical Risk campaigns.")
@@ -134,7 +136,7 @@ def render_bulk_leaderboard_section(df: pd.DataFrame, snap_dir: Path, user_api_k
                     parsed_p = parse_landing_page_from_raw_html("")
 
                 try:
-                    res = call_gemini_auditor(row, parsed_p, user_api_key, model_choice)
+                    res = call_ai_auditor(row, parsed_p, user_api_key, model_choice, provider=provider)
                     m_score = int(res.get("match_score", 0))
                     fold_score = int(res.get("above_the_fold_score", 0))
                     wasted = bulk_monthly_spend * ((100.0 - m_score) / 100.0)
@@ -260,23 +262,62 @@ def main():
         st.markdown("### ⚙️ System Configuration")
         st.markdown("---")
 
-        default_api_key = os.environ.get("GEMINI_API_KEY", "")
-        if not default_api_key and "GEMINI_API_KEY" in st.secrets:
-            default_api_key = st.secrets["GEMINI_API_KEY"]
-
-        user_api_key = st.text_input(
-            "Google Gemini API Key",
-            value=default_api_key,
-            type="password",
-            help="Enter your Google Gemini API key to execute real-time audits. Get one at aistudio.google.com"
-        )
-
-        model_choice = st.selectbox(
-            "Gemini Model Architecture",
-            options=["gemini-3.8-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+        st.markdown("##### ⚡ AI Inference Engine")
+        ai_provider = st.radio(
+            "Select Provider",
+            options=["⚡ Groq LPU (Ultra-Fast ~1s)", "🤖 Google Gemini"],
             index=0,
-            help="Select the AI reasoning engine for deterministic quote extraction and compliance analysis."
+            horizontal=True,
+            help="Groq LPU runs audits in ~1-2 seconds using dedicated hardware. Google Gemini provides deep multi-modal reasoning."
         )
+
+        is_groq = "groq" in ai_provider.lower()
+        if is_groq:
+            provider_tag = "groq"
+            engine_name = "Groq LPU"
+            default_groq_key = os.environ.get("GROQ_API_KEY", "")
+            if not default_groq_key and "GROQ_API_KEY" in st.secrets:
+                default_groq_key = st.secrets["GROQ_API_KEY"]
+
+            user_api_key = st.text_input(
+                "Groq API Key",
+                value=default_groq_key,
+                type="password",
+                help="Enter your Groq API key for near-instant (1-2s) audits. Free keys available at console.groq.com"
+            )
+
+            model_choice = st.selectbox(
+                "Groq Model Architecture",
+                options=[
+                    "openai/gpt-oss-120b",
+                    "llama-3.3-70b-versatile",
+                    "llama-3.1-8b-instant",
+                    "deepseek-r1-distill-llama-70b",
+                    "mixtral-8x7b-32768"
+                ],
+                index=0,
+                help="openai/gpt-oss-120b provides frontier reasoning and ultra-fast throughput on Groq LPUs."
+            )
+        else:
+            provider_tag = "gemini"
+            engine_name = "Google Gemini"
+            default_gemini_key = os.environ.get("GEMINI_API_KEY", "")
+            if not default_gemini_key and "GEMINI_API_KEY" in st.secrets:
+                default_gemini_key = st.secrets["GEMINI_API_KEY"]
+
+            user_api_key = st.text_input(
+                "Google Gemini API Key",
+                value=default_gemini_key,
+                type="password",
+                help="Enter your Google Gemini API key to execute real-time audits. Get one at aistudio.google.com"
+            )
+
+            model_choice = st.selectbox(
+                "Gemini Model Architecture",
+                options=["gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+                index=0,
+                help="Select the Gemini model architecture for the message match audit."
+            )
 
         st.markdown("---")
         st.markdown("### 🏢 Enterprise Compliance")
@@ -669,14 +710,14 @@ def main():
 
         if run_audit_btn:
             if not user_api_key or not user_api_key.strip():
-                st.error("❌ Google Gemini API Key required. Please enter your key in the sidebar.")
+                st.error(f"❌ {engine_name} API Key required. Please enter your key in the sidebar.")
             else:
                 audit_ad_row = pd.Series(ingested_record)
                 audit_ad_row["final_url"] = target_live_url
 
-                with st.spinner("🤖 Running Gemini AI Auditor (Analyzing Message Symmetry, Above-the-Fold Alignment & Regulated Compliance)..."):
+                with st.spinner(f"🚀 Running {engine_name} Auditor (Analyzing Message Symmetry, Above-the-Fold Alignment & Regulated Compliance)..."):
                     try:
-                        audit_result = call_gemini_auditor(audit_ad_row, parsed_page, user_api_key, model_choice)
+                        audit_result = call_ai_auditor(audit_ad_row, parsed_page, user_api_key, model_choice, provider=provider_tag)
                         st.session_state[f"audit_res_{get_field(ingested_record, 'pair_id')}"] = audit_result
                         st.session_state[f"audit_row_{get_field(ingested_record, 'pair_id')}"] = audit_ad_row
                         st.session_state[f"audit_page_{get_field(ingested_record, 'pair_id')}"] = parsed_page
@@ -1070,7 +1111,7 @@ def main():
                     st.json(res)
 
     with mode_tab2:
-        render_bulk_leaderboard_section(df, snap_dir, user_api_key, model_choice)
+        render_bulk_leaderboard_section(df, snap_dir, user_api_key, model_choice, provider=provider_tag)
 
 
 if __name__ == "__main__":

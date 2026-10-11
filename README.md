@@ -134,7 +134,7 @@ Export complete audit findings in professional formats:
 | Layer | Technologies |
 | :--- | :--- |
 | **Frontend Framework** | Streamlit (Python) |
-| **AI / LLM Engine** | Google Gemini API (`gemini-3.5-flash`, `gemini-3.8-flash`) |
+| **AI / LLM Engine** | Google Gemini API (`gemini-3.7-flash`, `gemini-3.5-flash`, `gemini-3.8-flash`, `gemini-2.0-flash`) |
 | **Web Scraping & DOM** | Requests (Chrome 124 Headers), BeautifulSoup4, lxml |
 | **Data Manipulation** | Pandas, NumPy |
 | **Report Generation** | OpenPyXL (Excel `.xlsx`), Python-Docx (Word `.docx`) |
