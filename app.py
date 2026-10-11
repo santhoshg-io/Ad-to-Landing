@@ -427,19 +427,66 @@ def main():
 
         # LEFT COLUMN: INGESTED AD COPY & SERP PREVIEW
         with col_left:
-            st.markdown(f"#### 1. Ingested Ad Copy (`{get_field(ingested_record, 'pair_id', 'AD_01')}`)")
+            current_pair_id = get_field(ingested_record, 'pair_id', 'AD_01')
+            st.markdown(f"#### 1. Ingested Ad Copy (`{current_pair_id}`)")
 
-            h1 = get_field(ingested_record, "headline_1", "Official Best Low Rates")
-            h2 = get_field(ingested_record, "headline_2", "Instant Online Approval")
-            h3 = get_field(ingested_record, "headline_3", "Zero Hidden Fees")
-            d1 = get_field(ingested_record, "description_1", "Apply online with instant verification and lowest rates guaranteed.")
-            d2 = get_field(ingested_record, "description_2", "Compare trusted solutions. 100% satisfaction guarantee.")
+            raw_h1 = get_field(ingested_record, "headline_1", "Official Best Low Rates")
+            raw_h2 = get_field(ingested_record, "headline_2", "Instant Online Approval")
+            raw_h3 = get_field(ingested_record, "headline_3", "Zero Hidden Fees")
+            raw_d1 = get_field(ingested_record, "description_1", "Apply online with instant verification and lowest rates guaranteed.")
+            raw_d2 = get_field(ingested_record, "description_2", "Compare trusted solutions. 100% satisfaction guarantee.")
+            raw_adv = get_field(ingested_record, "advertiser", "Brand Name")
+            raw_vert = get_field(ingested_record, "vertical", "General Commercial")
             p1 = get_field(ingested_record, "path_1", "Apply")
             p2 = get_field(ingested_record, "path_2", "Official")
-            adv = get_field(ingested_record, "advertiser", "Brand Name")
-            vert = get_field(ingested_record, "vertical", "General Commercial")
             kw = get_field(ingested_record, "keyword", "search query")
             dest_url = get_field(ingested_record, "final_url", "https://example.com")
+
+            # Auto-sync session state whenever active pair or upload changes
+            active_ad_sync_key = f"{ingest_method}_{current_pair_id}"
+            vert_options = list(REGULATED_VERTICALS.keys()) + ["General Commercial"]
+
+            if st.session_state.get("active_synced_ad_id") != active_ad_sync_key:
+                st.session_state["active_synced_ad_id"] = active_ad_sync_key
+                st.session_state["edit_h1"] = raw_h1
+                st.session_state["edit_h2"] = raw_h2
+                st.session_state["edit_h3"] = raw_h3
+                st.session_state["edit_d1"] = raw_d1
+                st.session_state["edit_d2"] = raw_d2
+                st.session_state["edit_adv"] = raw_adv
+                st.session_state["edit_vert"] = raw_vert if raw_vert in vert_options else "General Commercial"
+                try:
+                    st.session_state["single_monthly_spend"] = float(ingested_record.get("monthly_ad_spend", 10000.0))
+                except Exception:
+                    st.session_state["single_monthly_spend"] = 10000.0
+                try:
+                    st.session_state["single_cpc"] = float(ingested_record.get("cpc", 3.50))
+                except Exception:
+                    st.session_state["single_cpc"] = 3.50
+
+            with st.expander("📝 View & Edit Ad Copy Metadata", expanded=False):
+                e_h1 = st.text_input("Headline 1", key="edit_h1")
+                e_h2 = st.text_input("Headline 2", key="edit_h2")
+                e_h3 = st.text_input("Headline 3", key="edit_h3")
+                e_d1 = st.text_area("Description 1", key="edit_d1")
+                e_d2 = st.text_area("Description 2", key="edit_d2")
+                e_adv = st.text_input("Brand / Advertiser", key="edit_adv")
+                e_vert = st.selectbox("Vertical Classification", options=vert_options, key="edit_vert")
+
+                ingested_record["headline_1"] = e_h1
+                ingested_record["headline_2"] = e_h2
+                ingested_record["headline_3"] = e_h3
+                ingested_record["description_1"] = e_d1
+                ingested_record["description_2"] = e_d2
+                ingested_record["advertiser"] = e_adv
+                ingested_record["vertical"] = e_vert
+
+            # Dynamically reflect active edited values in SERP preview
+            active_h1 = e_h1 if e_h1 is not None else raw_h1
+            active_h2 = e_h2 if e_h2 is not None else raw_h2
+            active_h3 = e_h3 if e_h3 is not None else raw_h3
+            active_d1 = e_d1 if e_d1 is not None else raw_d1
+            active_d2 = e_d2 if e_d2 is not None else raw_d2
 
             display_url = dest_url.replace("https://", "").replace("http://", "").rstrip("/")
             if p1:
@@ -454,30 +501,13 @@ def main():
                     <span class="google-ad-url">{display_url}</span>
                 </div>
                 <div class="google-ad-title">
-                    {html.escape(h1)} | {html.escape(h2)}{f' | {html.escape(h3)}' if h3 else ''}
+                    {html.escape(active_h1)} | {html.escape(active_h2)}{f' | {html.escape(active_h3)}' if active_h3 else ''}
                 </div>
                 <div class="google-ad-desc">
-                    {html.escape(d1)} {html.escape(d2)}
+                    {html.escape(active_d1)} {html.escape(active_d2)}
                 </div>
             </div>
             """, unsafe_allow_html=True)
-
-            with st.expander("📝 View & Edit Ad Copy Metadata", expanded=False):
-                e_h1 = st.text_input("Headline 1", value=h1, key="edit_h1")
-                e_h2 = st.text_input("Headline 2", value=h2, key="edit_h2")
-                e_h3 = st.text_input("Headline 3", value=h3, key="edit_h3")
-                e_d1 = st.text_area("Description 1", value=d1, key="edit_d1")
-                e_d2 = st.text_area("Description 2", value=d2, key="edit_d2")
-                e_adv = st.text_input("Brand / Advertiser", value=adv, key="edit_adv")
-                e_vert = st.selectbox("Vertical Classification", options=list(REGULATED_VERTICALS.keys()) + ["General Commercial"], index=0 if vert in REGULATED_VERTICALS else len(REGULATED_VERTICALS), key="edit_vert")
-
-                ingested_record["headline_1"] = e_h1
-                ingested_record["headline_2"] = e_h2
-                ingested_record["headline_3"] = e_h3
-                ingested_record["description_1"] = e_d1
-                ingested_record["description_2"] = e_d2
-                ingested_record["advertiser"] = e_adv
-                ingested_record["vertical"] = e_vert
 
             st.markdown("<br/>", unsafe_allow_html=True)
             st.markdown("##### 💰 Campaign Budget & Traffic Modeling")
@@ -487,7 +517,6 @@ def main():
                     "Monthly PPC Budget ($)",
                     min_value=100.0,
                     max_value=1000000.0,
-                    value=float(ingested_record.get("monthly_ad_spend", 10000.0)),
                     step=500.0,
                     key="single_monthly_spend"
                 )
@@ -496,7 +525,6 @@ def main():
                     "Average CPC ($)",
                     min_value=0.10,
                     max_value=200.0,
-                    value=float(ingested_record.get("cpc", 3.50)),
                     step=0.25,
                     key="single_cpc"
                 )
