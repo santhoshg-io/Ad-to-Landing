@@ -7,13 +7,13 @@
 [![Design System](https://img.shields.io/badge/Theme-Pure%20White%20%7C%20Fresh%20Green-2E7D32.svg)]()
 
 
-live demo link : https://ad-to-landinggit-dgsbvja6emfjarvt7a8veu.streamlit.app/
-
 > **Enterprise-Grade AI Audit Engine by BigBoost AI**  
 > Protect PPC advertising budgets, eliminate conversion friction, enforce statutory regulatory compliance, and automate landing page copy optimization with zero hallucination.
 
+
+🔗 **Live Cloud Demo**: [https://ad-to-landinggit-dgsbvja6emfjarvt7a8veu.streamlit.app/](https://ad-to-landinggit-dgsbvja6emfjarvt7a8veu.streamlit.app/)
+
 ---
-live demo link : https://ad-to-landinggit-dgsbvja6emfjarvt7a8veu.streamlit.app/
 
 ## 🌟 Executive Overview
 
