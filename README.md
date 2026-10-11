@@ -13,6 +13,7 @@ live demo link : https://ad-to-landinggit-dgsbvja6emfjarvt7a8veu.streamlit.app/
 > Protect PPC advertising budgets, eliminate conversion friction, enforce statutory regulatory compliance, and automate landing page copy optimization with zero hallucination.
 
 ---
+live demo link : https://ad-to-landinggit-dgsbvja6emfjarvt7a8veu.streamlit.app/
 
 ## 🌟 Executive Overview
 
@@ -188,20 +189,36 @@ Open your browser at `http://localhost:8501`.
 
 ---
 
-## 📁 Repository Directory Structure
+## 📁 Enterprise Modular Architecture
 
 ```plaintext
-├── app.py                             # Core single-file Streamlit application
-├── requirements.txt                   # Production dependency specifications
-├── README.md                          # Comprehensive enterprise documentation
-├── ads.csv                            # Dataset of 60 Responsive Search Ad records
-├── landing_page_snapshots/            # Pre-cached offline HTML landing page files
-│   ├── pait_0001.html
-│   ├── pair_02.html
-│   └── ...
-└── .streamlit/                        # Streamlit configuration & cloud secrets
-    ├── config.toml                    # Server & theme configuration
-    └── secrets.toml                   # (Optional) API credentials
+ad-to-landing/
+│
+├── data/                               # 📁 Database & Dataset Storage
+│   ├── ads.csv                         # Master database of 60 Responsive Search Ads
+│   └── landing_page_snapshots/         # Pre-cached offline HTML landing page files (pair_01 to pair_60)
+│
+├── src/                                # 📁 Modular AI & Backend Logic Engine
+│   ├── __init__.py                     # Package entry point exposing core methods
+│   ├── config.py                       # 8 Regulated vertical registries, statutes & policy mappings
+│   ├── parsers.py                      # HTML DOM parser, JS hydration recovery & anti-bot live URL scraper
+│   ├── auditor.py                      # Google Gemini 3.5 Flash prompt orchestration & execution
+│   ├── verification.py                 # Zero-hallucination programmatic quote verification guard
+│   ├── compliance.py                   # Regulated category compliance & legal risk exposure engine
+│   └── exporters.py                    # Multi-format reporting engines (Excel .xlsx & Word .docx)
+│
+├── ui/                                 # 📁 UI Presentation & Design System
+│   ├── __init__.py                     # UI components interface
+│   └── styles.py                       # Strict Pure White (#FFFFFF), Fresh Green (#2E7D32) & Light Blue theme
+│
+├── .streamlit/                         # 📁 Streamlit Configuration & Deployment
+│   ├── config.toml                     # Streamlit server, port, and theme settings
+│   └── secrets.toml                    # Local Gemini API credentials (gitignored)
+│
+├── app.py                              # 🚀 Clean Application Controller & Streamlit Interface
+├── requirements.txt                    # Production environment dependencies
+├── .gitignore                          # Git ignore rules protecting local secrets
+└── README.md                           # Comprehensive BigBoost AI platform documentation
 ```
 
 ---
